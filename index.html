@@ -486,7 +486,7 @@ async function switchYasinTab(tab) {
         
         try {
             const data = (await (await fetch(`https://equran.id/api/v2/surat/36`)).json()).data;
-            let abtn = `<button onclick="playAudio('${data.audioFull['05']}')" class="w-full mb-4 bg-white text-emerald-600 p-3 rounded-xl text-sm font-bold shadow-sm border border-gray-200 flex items-center justify-center active:bg-emerald-50"><i class="fa-solid fa-play mr-2"></i> Putar Audio Yasin</button>`;
+            let abtn = `<button onclick="playAudio('${data.audioFull['05']}', this)" class="w-full mb-4 bg-white text-emerald-600 p-3 rounded-xl text-sm font-bold shadow-sm border border-gray-200 flex items-center justify-center active:bg-emerald-50"><i class="fa-solid fa-play mr-2"></i> <span class="play-text">Putar Audio Yasin</span></button>`;
             content.innerHTML = abtn + data.ayat.map(a => `
                 <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                     <div class="flex justify-between items-start mb-4 border-b border-gray-50 pb-3 gap-2">
@@ -496,7 +496,7 @@ async function switchYasinTab(tab) {
                     <div>
                         <div class="flex justify-between items-center mb-2">
                             <p class="text-emerald-600 text-xs font-bold flex-1 pr-2 italic">${a.teksLatin}</p>
-                            <button onclick="playAudio('${a.audio['05']}')" class="text-gray-400 bg-gray-50 rounded-full w-8 h-8 flex items-center justify-center shrink-0 border border-gray-200"><i class="fa-solid fa-play text-xs ml-0.5"></i></button>
+                            <button onclick="playAudio('${a.audio['05']}', this)" class="text-gray-400 bg-gray-50 rounded-full w-8 h-8 flex items-center justify-center shrink-0 border border-gray-200"><i class="fa-solid fa-play text-xs"></i></button>
                         </div>
                         <p class="text-gray-600 font-medium text-xs">${a.teksIndonesia}</p>
                     </div>
@@ -603,7 +603,7 @@ async function readSurah(no, nama) {
         const data = (await (await fetch(`https://equran.id/api/v2/surat/${no}`)).json()).data;
         const ayatsEl = document.getElementById('ayats');
         if (ayatsEl) {
-            let abtn = `<button onclick="playAudio('${data.audioFull['05']}')" class="w-full mb-4 bg-white text-emerald-600 p-3 rounded-xl text-sm font-bold shadow-sm border border-gray-200 flex items-center justify-center active:bg-emerald-50"><i class="fa-solid fa-play mr-2"></i> Putar Audio Full</button>`;
+            let abtn = `<button onclick="playAudio('${data.audioFull['05']}', this)" class="w-full mb-4 bg-white text-emerald-600 p-3 rounded-xl text-sm font-bold shadow-sm border border-gray-200 flex items-center justify-center active:bg-emerald-50"><i class="fa-solid fa-play mr-2"></i> <span class="play-text">Putar Audio Full</span></button>`;
             ayatsEl.innerHTML = abtn + data.ayat.map(a => `
                 <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                     <div class="flex justify-between items-start mb-4 border-b border-gray-50 pb-3 gap-2">
@@ -613,7 +613,7 @@ async function readSurah(no, nama) {
                     <div>
                         <div class="flex justify-between items-center mb-2">
                             <p class="text-emerald-600 text-xs font-bold flex-1 pr-2 italic">${a.teksLatin}</p>
-                            <button onclick="playAudio('${a.audio['05']}')" class="text-gray-400 bg-gray-50 rounded-full w-8 h-8 flex items-center justify-center shrink-0 border border-gray-200"><i class="fa-solid fa-play text-xs ml-0.5"></i></button>
+                            <button onclick="playAudio('${a.audio['05']}', this)" class="text-gray-400 bg-gray-50 rounded-full w-8 h-8 flex items-center justify-center shrink-0 border border-gray-200"><i class="fa-solid fa-play text-xs"></i></button>
                         </div>
                         <p class="text-gray-600 font-medium text-xs">${a.teksIndonesia}</p>
                     </div>
@@ -622,10 +622,66 @@ async function readSurah(no, nama) {
     } catch(e) {}
 }
 
-function playAudio(url) {
+let currentPlayingBtn = null;
+
+function resetAudioIcon() {
+    if (!currentPlayingBtn) return;
+    const icon = currentPlayingBtn.querySelector('i');
+    if (icon) {
+        icon.classList.remove('fa-pause');
+        icon.classList.add('fa-play');
+    }
+    const textSpan = currentPlayingBtn.querySelector('.play-text');
+    if (textSpan && textSpan.innerText.includes('Jeda')) {
+        textSpan.innerText = textSpan.innerText.replace('Jeda', 'Putar');
+    }
+}
+
+function playAudio(url, btn) {
     const audio = document.getElementById('quran-audio');
-    if(audio.src !== url) audio.src = url;
-    if(audio.paused) audio.play(); else audio.pause();
+    
+    // Mencegah isu perbedaan deteksi absolute vs relative URL
+    const isSameAudio = audio.src.includes(url);
+    
+    // Jika audio yang berbeda dimainkan, kembalikan ikon sebelumnya
+    if(!isSameAudio) {
+        resetAudioIcon();
+        
+        // Pause secara eksplisit sebelum ganti src agar memutus Promise sebelumnya
+        if(!audio.paused) {
+            audio.pause(); 
+        }
+        
+        audio.src = url;
+        currentPlayingBtn = btn;
+    }
+    
+    const icon = btn.querySelector('i');
+    const textSpan = btn.querySelector('.play-text');
+    
+    if(audio.paused) {
+        // audio.play() mengembalikan sebuah Promise. Kita harus menangkap errornya
+        // jika pemutaran dibatalkan (misal: user klik tombol pause terlalu cepat)
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                if (icon) { icon.classList.remove('fa-play'); icon.classList.add('fa-pause'); }
+                if (textSpan) textSpan.innerText = textSpan.innerText.replace('Putar', 'Jeda');
+            }).catch(error => {
+                console.log("Pemutaran audio diinterupsi dengan aman:", error);
+            });
+        }
+    } else {
+        audio.pause();
+        if (icon) { icon.classList.remove('fa-pause'); icon.classList.add('fa-play'); }
+        if (textSpan) textSpan.innerText = textSpan.innerText.replace('Jeda', 'Putar');
+    }
+    
+    // Kembalikan ke ikon play otomatis saat audio selesai
+    audio.onended = () => {
+        resetAudioIcon();
+        currentPlayingBtn = null;
+    };
 }
 
 function renderZakat(container) {

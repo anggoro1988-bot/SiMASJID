@@ -12,6 +12,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- PUSTAKA WAJIB UNTUK MENGHASILKAN FILE PDF MURNI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
@@ -660,8 +663,6 @@ function playAudio(url, btn) {
     const textSpan = btn.querySelector('.play-text');
     
     if(audio.paused) {
-        // audio.play() mengembalikan sebuah Promise. Kita harus menangkap errornya
-        // jika pemutaran dibatalkan (misal: user klik tombol pause terlalu cepat)
         const playPromise = audio.play();
         if (playPromise !== undefined) {
             playPromise.then(() => {
@@ -690,7 +691,6 @@ function renderZakat(container) {
     if (viewFilters.zakat === 'all' && years.length > 0) viewFilters.zakat = filterYear; 
 
     let filteredZakat = viewFilters.zakat === 'all' ? appData.zakat : appData.zakat.filter(z => z.tanggal.startsWith(viewFilters.zakat));
-    let btn = (currentUser && currentUser.role === 'admin') ? `<button onclick="cetakLaporan('zakat')" class="ml-2 bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 flex items-center active:bg-gray-900"><i class="fa-solid fa-file-pdf mr-1.5"></i> Simpan PDF</button>` : '';
     
     let totalBeras = filteredZakat.filter(z => z.satuan === 'Beras').reduce((s, z) => s + getN(z.jumlah), 0);
     let totalUang = filteredZakat.filter(z => z.satuan === 'Uang').reduce((s, z) => s + getN(z.jumlah), 0);
@@ -709,7 +709,7 @@ function renderZakat(container) {
             </div>
         </div>
         
-        <!-- TOMBOL CETAK DIPINDAH KE SINI AGAR LEBIH JELAS -->
+        <!-- TOMBOL SIMPAN PDF -->
         ${currentUser && currentUser.role === 'admin' ? `
         <div class="mb-4">
             <button onclick="cetakLaporan('zakat')" class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl text-sm flex justify-center items-center gap-2 active:bg-gray-900 shadow-sm">
@@ -749,7 +749,6 @@ function renderZakat(container) {
 function renderQurban(container) {
     let years = [...new Set(appData.qurban.map(q => q.tahun.toString()))].sort().reverse();
     let filteredQurban = viewFilters.qurban === 'all' ? appData.qurban : appData.qurban.filter(q => q.tahun.toString() === viewFilters.qurban);
-    let btn = (currentUser && currentUser.role === 'admin') ? `<button onclick="cetakLaporan('qurban')" class="ml-2 bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 flex items-center active:bg-gray-900"><i class="fa-solid fa-file-pdf mr-1.5"></i> Simpan PDF</button>` : '';
     let tSapi = filteredQurban.filter(q => q.hewan === 'Sapi').length;
     let tKambing = filteredQurban.filter(q => q.hewan !== 'Sapi').length;
 
@@ -767,7 +766,7 @@ function renderQurban(container) {
             </div>
         </div>
 
-        <!-- TOMBOL CETAK DIPINDAH KE SINI AGAR LEBIH JELAS -->
+        <!-- TOMBOL SIMPAN PDF -->
         ${currentUser && currentUser.role === 'admin' ? `
         <div class="mb-4">
             <button onclick="cetakLaporan('qurban')" class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl text-sm flex justify-center items-center gap-2 active:bg-gray-900 shadow-sm">
@@ -812,8 +811,6 @@ function renderKas(container) {
     let totalK = filteredKas.filter(k => k.jenis === 'Keluar').reduce((s, k) => s + getN(k.nominal), 0);
     let grandTotal = appData.kas.filter(k => k.jenis === 'Masuk').reduce((s, k) => s + getN(k.nominal), 0) - appData.kas.filter(k => k.jenis === 'Keluar').reduce((s, k) => s + getN(k.nominal), 0);
     
-    let btn = (currentUser && currentUser.role === 'admin') ? `<button onclick="cetakLaporan('kas')" class="ml-2 bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 flex items-center active:bg-gray-900"><i class="fa-solid fa-file-pdf mr-1.5"></i> Simpan PDF</button>` : '';
-
     let html = `
         <div class="mb-4 mt-2 px-1 flex items-end justify-between">
             <div>
@@ -828,7 +825,7 @@ function renderKas(container) {
             </div>
         </div>
 
-        <!-- TOMBOL CETAK DIPINDAH KE SINI AGAR LEBIH JELAS -->
+        <!-- TOMBOL SIMPAN PDF -->
         ${currentUser && currentUser.role === 'admin' ? `
         <div class="mb-4">
             <button onclick="cetakLaporan('kas')" class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl text-sm flex justify-center items-center gap-2 active:bg-gray-900 shadow-sm">
@@ -978,29 +975,37 @@ async function doLogin(e) {
     } else { showToast('Kredensial salah', 'error'); btn.innerHTML = og; btn.disabled = false; }
 }
 
+// ==============================================================
+// FUNGSI SIMPAN PDF (MENGGUNAKAN HTML2PDF MENGGANTIKAN WINDOW.PRINT)
+// ==============================================================
 function cetakLaporan(type) {
-    const p = appData.pengurus || {}; const namaMasjid = appData.profil.nama || "Masjid"; const dateObj = new Date();
+    const p = appData.pengurus || {}; 
+    const namaMasjid = appData.profil.nama || "Masjid"; 
+    const dateObj = new Date();
     const strDate = `Ngrejeng, ${dateObj.getDate()} ${['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][dateObj.getMonth()]} ${dateObj.getFullYear()}`;
     const timeStr = dateObj.toLocaleDateString('id-ID') + ' ' + dateObj.toLocaleTimeString('id-ID').replace(/\./g, ':');
-    const reportName = type === 'zakat' ? 'Zakat Fitrah' : (type === 'qurban' ? 'Qurban' : 'Keuangan');
-
-    const styleKop = `
-        @page { size: 216mm 330mm portrait; margin: 0; }
-        body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 11px; line-height: 1.2; margin:0; padding: 10mm 15mm 20mm 15mm; box-sizing:border-box; }
-        .kop-table { width: 100%; border-collapse: collapse; border-bottom: 3px solid #000; margin-bottom: 15px; }
-        .kop-table td { border: none !important; padding: 0; vertical-align: middle; }
-        .kop-logo { width: 100%; max-width: 140px; max-height: 100px; object-fit: contain; display: block; margin: 0 auto; }
-        .kop-text { text-align: center; padding-right: 15px; }
-        .kop-text h2 { margin: 0; font-size: 14px; font-weight: normal; letter-spacing: 1px; text-align: center; }
-        .kop-text h1 { margin: 0; font-size: 20px; font-weight: bold; font-family: Arial, sans-serif; letter-spacing: 2px; text-transform: uppercase; text-align: center; }
-        .kop-text p { margin: 2px 0 0 0; font-size: 11px; text-align: center; }
-        .print-footer { position: fixed; bottom: 10mm; left: 15mm; right: 15mm; font-size: 9px; color: #555; display: flex; justify-content: space-between; border-top: 1px solid #ddd; padding-top: 5px; }
-    `;
+    
+    // Header/Kop untuk File PDF
     const htmlKop = `
-        <table class="kop-table"><tr><td style="width: 25%; text-align: center; padding-bottom: 10px;"><img src="${LOGO_APP}" id="logo-print" class="kop-logo" alt="Logo"></td>
-        <td style="width: 50%;" class="kop-text"><h2>TAKMIR MASJID</h2><h1>${namaMasjid}</h1><p>${appData.profil.alamat || ''}</p><p>CP: ${appData.profil.kontak || ''}</p></td><td style="width: 25%;"></td></tr></table>`;
-    const footerHtml = `<div class="print-footer"><span>Cetak: ${timeStr}</span><span>Cetak Laporan ${reportName} - ${namaMasjid}</span></div>`;
+        <table class="kop-table">
+            <tr>
+                <td style="width: 20%; text-align: center; padding-bottom: 10px;">
+                    <img src="${LOGO_APP}" class="kop-logo" alt="Logo" crossorigin="anonymous">
+                </td>
+                <td style="width: 80%;" class="kop-text">
+                    <h2>TAKMIR MASJID</h2>
+                    <h1>${namaMasjid}</h1>
+                    <p>${appData.profil.alamat || ''}</p>
+                    <p>CP: ${appData.profil.kontak || ''}</p>
+                </td>
+            </tr>
+        </table>`;
+        
+    const footerHtml = `<div class="print-footer"><span>Dicetak pada: ${timeStr}</span><span>Sistem Informasi Masjid - ${namaMasjid}</span></div>`;
 
+    let contentHtml = '';
+
+    // LOGIKA PENYUSUNAN KONTEN LAPORAN
     if (type === 'zakat') {
         const year = viewFilters.zakat === 'all' ? new Date().getFullYear().toString() : viewFilters.zakat;
         const hijriYear = parseInt(year) - 579; 
@@ -1015,75 +1020,98 @@ function cetakLaporan(type) {
         let fisabilillahTotal = imam + khatib + perintis + muadzin + takmir + panitia;
         let totalMustahiq = totalRT + amil + mualaf + riqab + gharim + musafir + fisabilillahTotal;
 
-        let html = `<html><head><title>Laporan Zakat Fitrah</title><style>${styleKop} h3 { text-align: center; font-size: 13px; margin: 10px 0 3px 0; font-weight: bold; } h4 { text-align: center; font-size: 12px; margin: 0 0 8px 0; font-weight: normal; } .data-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; } .data-table th, .data-table td { border: 1px solid #000; padding: 4px; text-align: center; } .data-table th { background-color: #d1d5db; font-weight: bold; } .text-left { text-align: left !important; padding-left: 5px !important; } .text-right { text-align: right !important; padding-right: 5px !important; } .sig-table { width: 100%; border-collapse: collapse; margin-top: 15px; border: none !important; } .sig-table td { border: none !important; padding: 0; text-align: center; vertical-align: top; font-size: 11px; }</style></head><body>${htmlKop}
+        contentHtml = `${htmlKop}
             <h3>REKAP DAFTAR MUZAKKI</h3><h4>RAMADHAN ${hijriYear} H / ${year} M</h4>
             <table class="data-table"><tr><th rowspan="2">NO</th><th colspan="2">BERAS</th><th colspan="2">UANG</th><th rowspan="2">JUMLAH UANG (Rp)</th></tr><tr><th>Jiwa</th><th>Jumlah (Kg)</th><th>Jiwa</th><th>Rp</th></tr><tr><td>1</td><td>${jiwaBeras}</td><td>${kgBeras}</td><td>${jiwaUang}</td><td>${formatRupiah(rpPerJiwaUang).replace('Rp','').trim()}</td><td class="text-right">${formatRupiah(totalUang).replace('Rp','').trim()}</td></tr><tr style="font-weight: bold;"><td>TOTAL</td><td>${jiwaBeras}</td><td>${kgBeras}</td><td>${jiwaUang}</td><td>-</td><td class="text-right">${formatRupiah(totalUang).replace('Rp','').trim()}</td></tr></table>
             <h3>REKAP DAFTAR MUSTAHIQ</h3><h4>RAMADHAN ${hijriYear} H / ${year} M</h4>
             <table class="data-table"><tr><th style="width:5%">NO</th><th style="width:45%">MUSTAHIQ</th><th style="width:20%">JUMLAH<br>(Kg/Bks)</th><th style="width:30%">KETERANGAN ASNAF</th></tr><tr><td>1</td><td class="text-left">RT 05</td><td>${rt05 || '-'}</td><td rowspan="4">MUALAF : ${mualaf || '-'}<br>RIQAB : ${riqab || '-'}<br>GHARIM : ${gharim || '-'}<br>MUSAFIR : ${musafir || '-'}</td></tr><tr><td>2</td><td class="text-left">RT 06</td><td>${rt06 || '-'}</td></tr><tr><td>3</td><td class="text-left">RT 07</td><td>${rt07 || '-'}</td></tr><tr><td>4</td><td class="text-left">RT 08</td><td>${rt08 || '-'}</td></tr><tr style="font-weight: bold; background-color: #f3f4f6;"><td></td><td class="text-left">JUMLAH MUSTAHIQ RT</td><td>${totalRT || '-'}</td><td></td></tr><tr style="font-weight: bold;"><td></td><td class="text-left">AMIL</td><td>${amil || '-'}</td><td></td></tr><tr style="font-weight: bold;"><td></td><td class="text-left">FISABILILLAH</td><td>${fisabilillahTotal || '-'}</td><td></td></tr><tr style="font-weight: bold; background-color: #d1d5db;"><td colspan="2">TOTAL KESELURUHAN</td><td>${totalMustahiq || '-'}</td><td></td></tr></table>
             <h3 style="margin-top: 15px;">DAFTAR MUSTAHIQ FI SABILILLAH</h3>
             <table class="data-table" style="width: 70%; margin: 0 auto;"><tr><th style="width:10%">NO</th><th style="width:60%">BAGIAN</th><th style="width:30%">JUMLAH (Kg/Bks)</th></tr><tr><td>1</td><td class="text-left">IMAM HARIAN</td><td>${imam || '-'}</td></tr><tr><td>2</td><td class="text-left">KHATIB JUMAT</td><td>${khatib || '-'}</td></tr><tr><td>3</td><td class="text-left">PERINTIS</td><td>${perintis || '-'}</td></tr><tr><td>4</td><td class="text-left">MUADZIN</td><td>${muadzin || '-'}</td></tr><tr><td>5</td><td class="text-left">TAKMIR</td><td>${takmir || '-'}</td></tr><tr><td>6</td><td class="text-left">PANITIA RAMADHAN</td><td>${panitia || '-'}</td></tr><tr style="font-weight: bold; background-color: #d1d5db;"><td colspan="2">TOTAL</td><td>${fisabilillahTotal || '-'}</td></tr></table>
-            <table class="sig-table"><tr><td style="width: 33.33%;"><br>Ketua Panitia<br><br><br><br><b><u>${p.ketuaZakat || '......................'}</u></b></td><td style="width: 33.33%;">Mengetahui<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 33.33%;">${strDate}<br>Sekretaris<br><br><br><br><b><u>${p.sekretarisZakat || '......................'}</u></b></td></tr></table>${footerHtml}</body></html>`;
-        simpanPDF(html, `Laporan_Zakat_${year}.pdf`);
+            <table class="sig-table"><tr><td style="width: 33.33%;"><br>Ketua Panitia<br><br><br><br><b><u>${p.ketuaZakat || '......................'}</u></b></td><td style="width: 33.33%;">Mengetahui<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 33.33%;">${strDate}<br>Sekretaris<br><br><br><br><b><u>${p.sekretarisZakat || '......................'}</u></b></td></tr></table>
+            ${footerHtml}`;
     } else {
-        let t = type === 'qurban' ? 'Qurban' : 'Keuangan'; let filterText = ""; let data = [];
-        if (type === 'qurban') { data = viewFilters.qurban === 'all' ? appData.qurban : appData.qurban.filter(q => q.tahun.toString() === viewFilters.qurban); filterText = viewFilters.qurban === 'all' ? 'Semua Tahun' : 'Tahun ' + viewFilters.qurban; } 
-        else if (type === 'kas') { data = viewFilters.kas === 'all' ? appData.kas : appData.kas.filter(k => k.tanggal.startsWith(viewFilters.kas)); filterText = viewFilters.kas === 'all' ? 'Semua Waktu' : 'Bulan ' + formatBulanTahun(viewFilters.kas); }
+        let t = type === 'qurban' ? 'Qurban' : 'Keuangan'; 
+        let filterText = ""; let data = [];
+        
+        if (type === 'qurban') { 
+            data = viewFilters.qurban === 'all' ? appData.qurban : appData.qurban.filter(q => q.tahun.toString() === viewFilters.qurban); 
+            filterText = viewFilters.qurban === 'all' ? 'Semua Tahun' : 'Tahun ' + viewFilters.qurban; 
+        } else if (type === 'kas') { 
+            data = viewFilters.kas === 'all' ? appData.kas : appData.kas.filter(k => k.tanggal.startsWith(viewFilters.kas)); 
+            filterText = viewFilters.kas === 'all' ? 'Semua Waktu' : 'Bulan ' + formatBulanTahun(viewFilters.kas); 
+        }
 
-        let html = `<html><head><title>Cetak Laporan ${t}</title><style>${styleKop} h3 { text-align: center; font-size: 13px; margin: 10px 0 3px 0; font-weight: bold; text-transform: uppercase; } h4 { text-align: center; font-size: 12px; margin: 0 0 15px 0; font-weight: normal; } .data-table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11px} .data-table th,.data-table td{border:1px solid #000;padding:5px; text-align: center;} .data-table th{background-color:#d1d5db;font-weight: bold;} .sig-table{width:100%;border-collapse:collapse;margin-top:30px;border:none !important;} .sig-table td{border:none !important;padding:0;text-align:center;vertical-align:top;font-size:11px}</style></head><body>${htmlKop}<h3>LAPORAN ${t.toUpperCase()}</h3><h4>Periode: ${filterText}</h4>`;
+        contentHtml = `${htmlKop}<h3>LAPORAN ${t.toUpperCase()}</h3><h4>Periode: ${filterText}</h4>`;
         
         if (type === 'qurban') {
             let tSapi = data.filter(q => q.hewan === 'Sapi').length; let tKambing = data.filter(q => q.hewan === 'Kambing').length; let tDomba = data.filter(q => q.hewan === 'Domba').length;
-            html += `<table class="data-table"><thead><tr><th style="text-align:center">No</th><th style="text-align:center">Tahun</th><th>Shohibul Qurban</th><th style="text-align:center">Hewan</th><th>Keterangan</th></tr></thead><tbody>` + data.map((x, i) => `<tr><td style="text-align:center">${i+1}</td><td style="text-align:center">${x.tahun}</td><td style="text-align:left; padding-left:5px;">${x.nama}</td><td style="text-align:center">${x.hewan}</td><td style="text-align:left; padding-left:5px;">${x.keterangan}</td></tr>`).join('');
-            html += `</tbody></table><div style="margin-top:15px; font-size:11px;"><strong>Rekapitulasi Total Hewan Qurban:</strong><ul style="margin: 5px 0 0 20px; padding: 0;"><li>Sapi : ${tSapi} Ekor</li><li>Kambing : ${tKambing} Ekor</li><li>Domba : ${tDomba} Ekor</li></ul></div><table class="sig-table"><tr><td style="width: 33.33%;"><br>Ketua Panitia Qurban<br><br><br><br><b><u>${p.ketuaQurban || '......................'}</u></b></td><td style="width: 33.33%;">Mengetahui,<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 33.33%;">${strDate}<br>Sekretaris Qurban<br><br><br><br><b><u>${p.sekretarisQurban || '......................'}</u></b></td></tr></table>`;
+            contentHtml += `<table class="data-table"><thead><tr><th style="text-align:center">No</th><th style="text-align:center">Tahun</th><th>Shohibul Qurban</th><th style="text-align:center">Hewan</th><th>Keterangan</th></tr></thead><tbody>` + data.map((x, i) => `<tr><td style="text-align:center">${i+1}</td><td style="text-align:center">${x.tahun}</td><td style="text-align:left; padding-left:5px;">${x.nama}</td><td style="text-align:center">${x.hewan}</td><td style="text-align:left; padding-left:5px;">${x.keterangan}</td></tr>`).join('');
+            contentHtml += `</tbody></table><div style="margin-top:15px; font-size:12px;"><strong>Rekapitulasi Total Hewan Qurban:</strong><ul style="margin: 5px 0 0 20px; padding: 0;"><li>Sapi : ${tSapi} Ekor</li><li>Kambing : ${tKambing} Ekor</li><li>Domba : ${tDomba} Ekor</li></ul></div><table class="sig-table"><tr><td style="width: 33.33%;"><br>Ketua Panitia Qurban<br><br><br><br><b><u>${p.ketuaQurban || '......................'}</u></b></td><td style="width: 33.33%;">Mengetahui,<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 33.33%;">${strDate}<br>Sekretaris Qurban<br><br><br><br><b><u>${p.sekretarisQurban || '......................'}</u></b></td></tr></table>`;
         } else if (type === 'kas') {
             let tMasuk = data.filter(k => k.jenis === 'Masuk').reduce((s, k) => s + getN(k.nominal), 0); let tKeluar = data.filter(k => k.jenis === 'Keluar').reduce((s, k) => s + getN(k.nominal), 0); let grandTotal = appData.kas.filter(k => k.jenis === 'Masuk').reduce((s, k) => s + getN(k.nominal), 0) - appData.kas.filter(k => k.jenis === 'Keluar').reduce((s, k) => s + getN(k.nominal), 0);
-            html += `<table class="data-table"><thead><tr><th style="text-align:center">No</th><th>Tanggal</th><th>Kategori</th><th>Keterangan</th><th>Pemasukan</th><th>Pengeluaran</th></tr></thead><tbody>` + data.slice().reverse().map((x, i) => `<tr><td style="text-align:center">${i+1}</td><td style="text-align:center">${formatTanggalIndo(x.tanggal)}</td><td style="text-align:left; padding-left:5px;">${x.kategori || '-'}</td><td style="text-align:left; padding-left:5px;">${x.keterangan}</td><td style="text-align:right; padding-right:5px;">${x.jenis === 'Masuk' ? formatRupiah(getN(x.nominal)) : '-'}</td><td style="text-align:right; padding-right:5px;">${x.jenis === 'Keluar' ? formatRupiah(getN(x.nominal)) : '-'}</td></tr>`).join('');
-            html += `<tr><th colspan="4" style="text-align:right; padding-right:5px;">Total Transaksi Periode Ini</th><th style="text-align:right; padding-right:5px;">${formatRupiah(tMasuk)}</th><th style="text-align:right; padding-right:5px;">${formatRupiah(tKeluar)}</th></tr><tr><th colspan="4" style="text-align:right; padding-right:5px;">Saldo Akhir Keseluruhan Kas</th><th colspan="2" style="text-align:center">${formatRupiah(grandTotal)}</th></tr></tbody></table><table class="sig-table" style="width: 100%;"><tr><td style="width: 50%;">Mengetahui,<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 50%;">${strDate}<br>Bendahara<br><br><br><br><b><u>${p.bendahara1 || '......................'}</u></b></td></tr></table>`;
+            contentHtml += `<table class="data-table"><thead><tr><th style="text-align:center">No</th><th>Tanggal</th><th>Kategori</th><th>Keterangan</th><th>Pemasukan</th><th>Pengeluaran</th></tr></thead><tbody>` + data.slice().reverse().map((x, i) => `<tr><td style="text-align:center">${i+1}</td><td style="text-align:center">${formatTanggalIndo(x.tanggal)}</td><td style="text-align:left; padding-left:5px;">${x.kategori || '-'}</td><td style="text-align:left; padding-left:5px;">${x.keterangan}</td><td style="text-align:right; padding-right:5px;">${x.jenis === 'Masuk' ? formatRupiah(getN(x.nominal)) : '-'}</td><td style="text-align:right; padding-right:5px;">${x.jenis === 'Keluar' ? formatRupiah(getN(x.nominal)) : '-'}</td></tr>`).join('');
+            contentHtml += `<tr><th colspan="4" style="text-align:right; padding-right:5px;">Total Transaksi Periode Ini</th><th style="text-align:right; padding-right:5px;">${formatRupiah(tMasuk)}</th><th style="text-align:right; padding-right:5px;">${formatRupiah(tKeluar)}</th></tr><tr><th colspan="4" style="text-align:right; padding-right:5px;">Saldo Akhir Keseluruhan Kas</th><th colspan="2" style="text-align:center">${formatRupiah(grandTotal)}</th></tr></tbody></table><table class="sig-table" style="width: 100%;"><tr><td style="width: 50%;">Mengetahui,<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 50%;">${strDate}<br>Bendahara<br><br><br><br><b><u>${p.bendahara1 || '......................'}</u></b></td></tr></table>`;
         }
-        const filterLabel = type === 'kas' ? (viewFilters.kas === 'all' ? 'Semua' : viewFilters.kas.replace('-','_')) : (viewFilters.qurban === 'all' ? 'Semua' : viewFilters.qurban);
-        html += `${footerHtml}</body></html>`;
-        simpanPDF(html, `Laporan_${t}_${filterLabel}.pdf`);
-    }
-}
-
-async function simpanPDF(htmlContent, namaFile) {
-    // Buka window baru untuk print-to-PDF via browser dialog
-    const printScript = `<script>
-        window.onload = function() {
-            // Tampilkan dialog Save As PDF dari browser
-            window.print();
-        };
-    <\/script>`;
-    const fullHtml = htmlContent.replace('</body>', printScript + '</body>');
-
-    // Coba File System Access API (Chrome/Edge desktop) — pengguna bisa pilih folder
-    if (window.showSaveFilePicker) {
-        try {
-            const fileHandle = await window.showSaveFilePicker({
-                suggestedName: namaFile.replace('.pdf', '.html'),
-                types: [{
-                    description: 'File HTML (Buka & Print sebagai PDF)',
-                    accept: { 'text/html': ['.html'] }
-                }]
-            });
-            const writable = await fileHandle.createWritable();
-            await writable.write(new Blob([fullHtml], { type: 'text/html' }));
-            await writable.close();
-            showToast('File disimpan! Buka file lalu Ctrl+P → Simpan sebagai PDF', 'success');
-            return;
-        } catch (err) {
-            if (err.name === 'AbortError') return; // Pengguna batal
-        }
+        contentHtml += footerHtml;
     }
 
-    // Fallback: download otomatis ke folder Downloads
-    const blob = new Blob([fullHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = namaFile.replace('.pdf', '.html');
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a); URL.revokeObjectURL(url);
-    showToast('File diunduh! Buka file lalu Ctrl+P → Simpan sebagai PDF', 'success');
+    // MEMUNCULKAN NOTIFIKASI LOADING
+    showToast('Membuat PDF, mohon tunggu...', 'success');
+
+    // 1. BUAT WADAH TERSEMBUNYI UNTUK MERENDER PDF
+    const printArea = document.createElement('div');
+    printArea.id = 'print-area';
+    printArea.style.position = 'absolute';
+    printArea.style.left = '-9999px';
+    printArea.style.top = '0';
+    printArea.style.width = '800px'; 
+    printArea.style.backgroundColor = '#fff';
+    printArea.style.color = '#000';
+    printArea.style.padding = '30px';
+    printArea.style.fontFamily = "'Times New Roman', Times, serif";
+    
+    printArea.innerHTML = `
+        <style>
+            h3 { text-align: center; font-size: 16px; margin: 10px 0 3px 0; font-weight: bold; text-transform: uppercase; } 
+            h4 { text-align: center; font-size: 14px; margin: 0 0 20px 0; font-weight: normal; } 
+            .data-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; } 
+            .data-table th, .data-table td { border: 1px solid #000; padding: 8px; text-align: center; } 
+            .data-table th { background-color: #e5e7eb; font-weight: bold; } 
+            .text-left { text-align: left !important; padding-left: 10px !important; }
+            .text-right { text-align: right !important; padding-right: 10px !important; }
+            .sig-table { width: 100%; border-collapse: collapse; margin-top: 40px; border: none !important; } 
+            .sig-table td { border: none !important; padding: 0; text-align: center; vertical-align: top; font-size: 13px; }
+            .kop-table { width: 100%; border-collapse: collapse; border-bottom: 3px solid #000; margin-bottom: 20px; }
+            .kop-table td { border: none !important; padding: 0; vertical-align: middle; }
+            .kop-logo { max-width: 120px; max-height: 100px; object-fit: contain; display: block; margin: 0 auto; }
+            .kop-text { text-align: center; padding-right: 15px; }
+            .kop-text h2 { margin: 0; font-size: 18px; font-weight: normal; letter-spacing: 1px; text-align: center; }
+            .kop-text h1 { margin: 0; font-size: 24px; font-weight: bold; font-family: Arial, sans-serif; letter-spacing: 2px; text-transform: uppercase; text-align: center; }
+            .kop-text p { margin: 3px 0 0 0; font-size: 13px; text-align: center; }
+            .print-footer { margin-top: 40px; font-size: 11px; color: #555; display: flex; justify-content: space-between; border-top: 1px solid #ddd; padding-top: 10px; }
+        </style>
+        ${contentHtml}
+    `;
+    
+    document.body.appendChild(printArea);
+
+    // 2. KONFIGURASI DAN EKSEKUSI HTML2PDF
+    const opt = {
+        margin:       10,
+        filename:     `Laporan_${type}_${dateObj.getTime()}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(printArea).save().then(() => {
+        document.body.removeChild(printArea);
+        showToast('PDF berhasil diunduh!', 'success');
+    }).catch(err => {
+        console.error(err);
+        document.body.removeChild(printArea);
+        showToast('Gagal membuat PDF', 'error');
+    });
 }
 
 // LOGIKA NAVIGASI ADMIN PANEL BARU
@@ -1091,16 +1119,13 @@ function openAdminMenu(id, title) {
     activeAdminTab = id; 
     activeAdminTitle = title;
     
-    // Sembunyikan grid menu utama
     document.getElementById('admin-main').classList.add('hidden');
     document.getElementById('admin-main').classList.remove('block');
     
-    // Tampilkan panel detail form
     document.getElementById('admin-detail').classList.remove('hidden');
     document.getElementById('admin-detail').classList.add('block');
     document.getElementById('admin-detail-title').innerText = title;
     
-    // Sembunyikan semua konten form dan tampilkan yang dipilih
     document.querySelectorAll('.a-con').forEach(x => {
         x.classList.add('hidden');
         x.classList.remove('block');
@@ -1116,7 +1141,6 @@ function closeAdminMenu() {
     activeAdminTab = ''; 
     activeAdminTitle = '';
     
-    // Sembunyikan detail dan kembali ke grid menu
     document.getElementById('admin-detail').classList.add('hidden');
     document.getElementById('admin-detail').classList.remove('block');
     document.getElementById('admin-main').classList.remove('hidden');
@@ -1163,50 +1187,42 @@ function renderAdmin(container) {
             </div>
             
             <div class="grid grid-cols-2 gap-3 mb-6 px-1">
-                <!-- MENU: KAS -->
                 <button onclick="openAdminMenu('a-kas', 'Kelola Kas')" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center active:bg-emerald-50">
                     <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-3"><i class="fa-solid fa-wallet text-2xl"></i></div>
                     <span class="text-sm font-bold text-gray-800">Kas Masjid</span>
                 </button>
                 
-                <!-- MENU: KHOTIB -->
                 <button onclick="openAdminMenu('a-kho', 'Jadwal Khotib')" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center active:bg-blue-50">
                     <div class="w-14 h-14 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3"><i class="fa-solid fa-microphone text-2xl"></i></div>
                     <span class="text-sm font-bold text-gray-800">Khotib</span>
                 </button>
                 
-                <!-- MENU: TERIMA ZAKAT -->
                 <button onclick="openAdminMenu('a-zak', 'Terima Zakat')" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center active:bg-teal-50">
                     <div class="w-14 h-14 bg-teal-50 text-teal-600 rounded-full flex items-center justify-center mb-3"><i class="fa-solid fa-sack-dollar text-2xl"></i></div>
                     <span class="text-sm font-bold text-gray-800">Terima Zakat</span>
                 </button>
                 
-                <!-- MENU: SALUR ZAKAT -->
                 <button onclick="openAdminMenu('a-zak-dist', 'Penyaluran Zakat')" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center active:bg-orange-50">
                     <div class="w-14 h-14 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mb-3"><i class="fa-solid fa-hand-holding-hand text-2xl"></i></div>
                     <span class="text-sm font-bold text-gray-800">Salur Zakat</span>
                 </button>
                 
-                <!-- MENU: QURBAN -->
                 <button onclick="openAdminMenu('a-qur', 'Data Qurban')" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center active:bg-indigo-50">
                     <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-3"><i class="fa-solid fa-cow text-2xl"></i></div>
                     <span class="text-sm font-bold text-gray-800">Data Qurban</span>
                 </button>
                 
-                <!-- MENU: PROFIL -->
                 <button onclick="openAdminMenu('a-pro', 'Profil Masjid')" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center active:bg-purple-50">
                     <div class="w-14 h-14 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center mb-3"><i class="fa-solid fa-mosque text-2xl"></i></div>
                     <span class="text-sm font-bold text-gray-800">Profil</span>
                 </button>
                 
-                <!-- MENU: PENGURUS -->
                 <button onclick="openAdminMenu('a-peng', 'Susunan Pengurus')" class="col-span-2 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center active:bg-rose-50">
                     <div class="w-14 h-14 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mb-3"><i class="fa-solid fa-users text-2xl"></i></div>
                     <span class="text-sm font-bold text-gray-800">Susunan Pengurus</span>
                 </button>
             </div>
             
-            <!-- LOGOUT BUTTON EKSPLISIT DI DASHBOARD ADMIN -->
             <button onclick="currentUser=null;activeAdminTab='';loadView('beranda');" class="w-full bg-white border border-red-200 text-red-500 font-bold py-3.5 rounded-xl text-sm flex justify-center items-center gap-2 active:bg-red-50 mb-2">
                 <i class="fa-solid fa-sign-out-alt"></i> Keluar dari Admin
             </button>

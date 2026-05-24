@@ -21,7 +21,7 @@
             background-color: #f3f4f6; 
             margin: 0 !important; 
             padding: 0 !important; 
-            overflow: hidden !important; /* Kunci background agar tidak bisa digeser */
+            overflow: hidden !important; 
         }
         .quran-text { font-size: 1.8rem; line-height: 2.5; font-family: 'Amiri', serif; text-align: right; }
         
@@ -38,18 +38,6 @@
         ::-webkit-scrollbar { display: none; }
         * { -ms-overflow-style: none; scrollbar-width: none; }
         .blogger-thumbnail { display: none !important; }
-
-        /* HILANGKAN FOOTER & WATERMARK BAWAAN BLOGGER (Michael Elkan, Diberdayakan oleh Blogger, dll) */
-        #Attribution1, .attribution, #footer, .footer, .footer-outer, #footer-wrapper, 
-        .bg-photo-container, .bg-photo-overlay, .blogger-gear, .centered-bottom {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            height: 0 !important;
-            width: 0 !important;
-            position: absolute !important;
-            z-index: -9999 !important;
-        }
 
         /* Bottom Sheet Transition */
         #more-menu-overlay { transition: opacity 0.3s ease; }
@@ -74,7 +62,7 @@
             </header>
 
             <main class="flex-1 overflow-y-auto p-4 pb-24 bg-gray-50" id="main-content">
-                <div id="loading-screen" class="h-full hidden items-center justify-center gap-3 flex-col">
+                <div id="loading-screen" class="h-full hidden flex-col items-center justify-center gap-3">
                     <div class="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-emerald-600"></div>
                     <p class="text-sm text-gray-500 font-medium">Memuat data...</p>
                 </div>
@@ -126,7 +114,7 @@
 <script>
 // KONFIGURASI PENTING
 const IS_PREVIEW = false; 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwVi5CceP0N8zmLqYGC6CYwfVPKgEWqW1KoZ1A-6pQfKuzzGvQDBZjXhhu6EAwTnxEc/exec"; 
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwS5p2mM1Ja1ZCo_g7Gg_j3iDoBtdto6srxumHAQrN2Zt_stxjNkQ0zgbLXfeKR2EvP/exec"; 
 const LOGO_APP = "https://lh3.googleusercontent.com/d/1APv_1jTkU07oSpkzle2UppS2fxlqTr0b"; 
 
 document.getElementById('app-logo-header').src = LOGO_APP;
@@ -148,9 +136,7 @@ document.getElementById('pwa-manifest').setAttribute('href', 'data:application/j
 // UTILS & HELPER
 function formatRupiah(angka) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0); }
 function formatTanggalIndo(tglStr) {
-    if(!tglStr) return '-'; 
-    let d = (tglStr instanceof Date) ? tglStr : new Date(tglStr); 
-    if(isNaN(d.getTime())) return String(tglStr);
+    if(!tglStr) return '-'; let d = new Date(tglStr); if(isNaN(d.getTime())) return tglStr;
     const bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
     return `${String(d.getDate()).padStart(2,'0')} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
 }
@@ -167,7 +153,7 @@ function getN(val) {
 function updateFilter(type, val) { viewFilters[type] = val; loadView(type); }
 function updateNavTitle(titleStr) {
     const navTitle = document.getElementById('nav-title');
-    if (navTitle) navTitle.innerText = (titleStr && titleStr.trim()) ? titleStr.toUpperCase() : "AL-IKHLAS";
+    if (navTitle) navTitle.innerText = titleStr ? titleStr.toUpperCase() : "AL-IKHLAS";
 }
 function copyToClipboard(text) {
     const el = document.createElement('textarea'); el.value = text;
@@ -190,7 +176,7 @@ function showToast(msg, type = 'success') {
 
 // API HANDLER
 async function fetchApp(action, payload = {}) {
-    if (GAS_URL === "http://script.google.com/macros/s/AKfycbwVi5CceP0N8zmLqYGC6CYwfVPKgEWqW1KoZ1A-6pQfKuzzGvQDBZjXhhu6EAwTnxEc/exec" || !GAS_URL.startsWith("http")) {
+    if (GAS_URL === "http://script.google.com/macros/s/AKfycbwS5p2mM1Ja1ZCo_g7Gg_j3iDoBtdto6srxumHAQrN2Zt_stxjNkQ0zgbLXfeKR2EvP/exec" || !GAS_URL.startsWith("http")) {
         if (action === 'getData') return { status: 'success', profil: appData.profil || {}, pengurus: appData.pengurus || {}, khotib: [], kas: [], zakat: [], qurban: [], zakatDist: [] };
         return { status: 'error', message: 'URL GAS belum disetel.' };
     }
@@ -638,19 +624,17 @@ async function readSurah(no, nama) {
 
 function playAudio(url) {
     const audio = document.getElementById('quran-audio');
-    if(!audio) return;
-    const isSameUrl = audio.src === url || audio.getAttribute('data-src') === url;
-    if (!isSameUrl) { audio.src = url; audio.setAttribute('data-src', url); }
+    if(audio.src !== url) audio.src = url;
     if(audio.paused) audio.play(); else audio.pause();
 }
 
 function renderZakat(container) {
-    let years = [...new Set(appData.zakat.filter(z => z.tanggal).map(z => z.tanggal.substring(0, 4)))].sort().reverse();
+    let years = [...new Set(appData.zakat.map(z => z.tanggal.substring(0, 4)))].sort().reverse();
     let filterYear = viewFilters.zakat === 'all' ? (years.length > 0 ? years[0] : new Date().getFullYear().toString()) : viewFilters.zakat;
     if (viewFilters.zakat === 'all' && years.length > 0) viewFilters.zakat = filterYear; 
 
-    let filteredZakat = viewFilters.zakat === 'all' ? appData.zakat : appData.zakat.filter(z => z.tanggal && z.tanggal.startsWith(viewFilters.zakat));
-    let btn = (currentUser && currentUser.role === 'admin') ? `<button onclick="cetakLaporan('zakat')" class="ml-2 bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 flex items-center"><i class="fa-solid fa-print mr-1.5"></i> Cetak</button>` : '';
+    let filteredZakat = viewFilters.zakat === 'all' ? appData.zakat : appData.zakat.filter(z => z.tanggal.startsWith(viewFilters.zakat));
+    let btn = (currentUser && currentUser.role === 'admin') ? `<button onclick="cetakLaporan('zakat')" class="ml-2 bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 flex items-center active:bg-gray-900"><i class="fa-solid fa-file-pdf mr-1.5"></i> Simpan PDF</button>` : '';
     
     let totalBeras = filteredZakat.filter(z => z.satuan === 'Beras').reduce((s, z) => s + getN(z.jumlah), 0);
     let totalUang = filteredZakat.filter(z => z.satuan === 'Uang').reduce((s, z) => s + getN(z.jumlah), 0);
@@ -666,9 +650,16 @@ function renderZakat(container) {
                     <option value="all">Semua</option>
                     ${years.map(y => `<option value="${y}" ${viewFilters.zakat === y ? 'selected' : ''}>${y}</option>`).join('')}
                 </select>
-                ${btn}
             </div>
         </div>
+        
+        <!-- TOMBOL CETAK DIPINDAH KE SINI AGAR LEBIH JELAS -->
+        ${currentUser && currentUser.role === 'admin' ? `
+        <div class="mb-4">
+            <button onclick="cetakLaporan('zakat')" class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl text-sm flex justify-center items-center gap-2 active:bg-gray-900 shadow-sm">
+                <i class="fa-solid fa-file-pdf"></i> Simpan & Cetak Laporan PDF
+            </button>
+        </div>` : ''}
 
         <div class="grid grid-cols-2 gap-3 mb-5">
             <div class="bg-amber-500 text-white p-4 rounded-xl shadow-sm text-center">
@@ -702,7 +693,7 @@ function renderZakat(container) {
 function renderQurban(container) {
     let years = [...new Set(appData.qurban.map(q => q.tahun.toString()))].sort().reverse();
     let filteredQurban = viewFilters.qurban === 'all' ? appData.qurban : appData.qurban.filter(q => q.tahun.toString() === viewFilters.qurban);
-    let btn = (currentUser && currentUser.role === 'admin') ? `<button onclick="cetakLaporan('qurban')" class="ml-2 bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 flex items-center"><i class="fa-solid fa-print mr-1.5"></i> Cetak</button>` : '';
+    let btn = (currentUser && currentUser.role === 'admin') ? `<button onclick="cetakLaporan('qurban')" class="ml-2 bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 flex items-center active:bg-gray-900"><i class="fa-solid fa-file-pdf mr-1.5"></i> Simpan PDF</button>` : '';
     let tSapi = filteredQurban.filter(q => q.hewan === 'Sapi').length;
     let tKambing = filteredQurban.filter(q => q.hewan !== 'Sapi').length;
 
@@ -717,9 +708,16 @@ function renderQurban(container) {
                     <option value="all">Semua</option>
                     ${years.map(y => `<option value="${y}" ${viewFilters.qurban === y ? 'selected' : ''}>${y}</option>`).join('')}
                 </select>
-                ${btn}
             </div>
         </div>
+
+        <!-- TOMBOL CETAK DIPINDAH KE SINI AGAR LEBIH JELAS -->
+        ${currentUser && currentUser.role === 'admin' ? `
+        <div class="mb-4">
+            <button onclick="cetakLaporan('qurban')" class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl text-sm flex justify-center items-center gap-2 active:bg-gray-900 shadow-sm">
+                <i class="fa-solid fa-file-pdf"></i> Simpan & Cetak Laporan PDF
+            </button>
+        </div>` : ''}
 
         <div class="grid grid-cols-2 gap-3 mb-5">
             <div class="bg-indigo-600 text-white p-4 rounded-xl shadow-sm text-center">
@@ -751,14 +749,14 @@ function renderQurban(container) {
 }
 
 function renderKas(container) {
-    let months = [...new Set(appData.kas.filter(k => k.tanggal).map(k => k.tanggal.substring(0, 7)))].sort().reverse();
-    let filteredKas = viewFilters.kas === 'all' ? appData.kas : appData.kas.filter(k => k.tanggal && k.tanggal.startsWith(viewFilters.kas));
+    let months = [...new Set(appData.kas.map(k => k.tanggal.substring(0, 7)))].sort().reverse();
+    let filteredKas = viewFilters.kas === 'all' ? appData.kas : appData.kas.filter(k => k.tanggal.startsWith(viewFilters.kas));
     
     let totalM = filteredKas.filter(k => k.jenis === 'Masuk').reduce((s, k) => s + getN(k.nominal), 0);
     let totalK = filteredKas.filter(k => k.jenis === 'Keluar').reduce((s, k) => s + getN(k.nominal), 0);
     let grandTotal = appData.kas.filter(k => k.jenis === 'Masuk').reduce((s, k) => s + getN(k.nominal), 0) - appData.kas.filter(k => k.jenis === 'Keluar').reduce((s, k) => s + getN(k.nominal), 0);
     
-    let btn = (currentUser && currentUser.role === 'admin') ? `<button onclick="cetakLaporan('kas')" class="ml-2 bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 flex items-center"><i class="fa-solid fa-print mr-1.5"></i> Cetak</button>` : '';
+    let btn = (currentUser && currentUser.role === 'admin') ? `<button onclick="cetakLaporan('kas')" class="ml-2 bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm shrink-0 flex items-center active:bg-gray-900"><i class="fa-solid fa-file-pdf mr-1.5"></i> Simpan PDF</button>` : '';
 
     let html = `
         <div class="mb-4 mt-2 px-1 flex items-end justify-between">
@@ -771,9 +769,16 @@ function renderKas(container) {
                     <option value="all">Semua</option>
                     ${months.map(m => `<option value="${m}" ${viewFilters.kas === m ? 'selected' : ''}>${formatBulanTahun(m)}</option>`).join('')}
                 </select>
-                ${btn}
             </div>
         </div>
+
+        <!-- TOMBOL CETAK DIPINDAH KE SINI AGAR LEBIH JELAS -->
+        ${currentUser && currentUser.role === 'admin' ? `
+        <div class="mb-4">
+            <button onclick="cetakLaporan('kas')" class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl text-sm flex justify-center items-center gap-2 active:bg-gray-900 shadow-sm">
+                <i class="fa-solid fa-file-pdf"></i> Simpan & Cetak Laporan PDF
+            </button>
+        </div>` : ''}
 
         <div class="bg-emerald-600 text-white rounded-xl p-5 mb-5 shadow-sm text-center">
             <p class="text-xs text-emerald-100 mb-1 font-semibold">Total Saldo Akhir</p>
@@ -802,7 +807,8 @@ function renderKas(container) {
                     <i class="fa-solid ${k.jenis === 'Masuk' ? 'fa-arrow-down' : 'fa-arrow-up'} text-xs"></i>
                 </div>
                 <div>
-                    <h4 class="text-xs font-bold text-gray-800 mb-0.5 line-clamp-1">${k.keterangan}</h4>
+                    <!-- Menampilkan Kategori sebelum Keterangan -->
+                    <h4 class="text-xs font-bold text-gray-800 mb-0.5 line-clamp-1">${k.kategori ? `[${k.kategori}] ` : ''}${k.keterangan}</h4>
                     <p class="text-[10px] font-semibold text-gray-500">${formatTanggalIndo(k.tanggal)}</p>
                 </div>
             </div>
@@ -910,12 +916,10 @@ function renderLogin(container) {
 async function doLogin(e) {
     const btn = e.currentTarget; const og = btn.innerHTML;
     btn.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mx-auto"></div>'; btn.disabled = true;
-    try {
-        const res = await fetchApp('login', { user: document.getElementById('usr').value, pass: document.getElementById('pas').value });
-        if(res && res.status === 'success') { 
-            currentUser = { role: res.role || 'admin' }; loadView('admin', true); showToast('Login berhasil', 'success');
-        } else { showToast((res && res.message) || 'Kredensial salah', 'error'); btn.innerHTML = og; btn.disabled = false; }
-    } catch(err) { showToast('Gagal login, periksa koneksi', 'error'); btn.innerHTML = og; btn.disabled = false; }
+    const res = await fetchApp('login', { user: document.getElementById('usr').value, pass: document.getElementById('pas').value });
+    if(res.status === 'success') { 
+        currentUser = { role: res.role || 'admin' }; loadView('admin', true); showToast('Login berhasil', 'success');
+    } else { showToast('Kredensial salah', 'error'); btn.innerHTML = og; btn.disabled = false; }
 }
 
 function cetakLaporan(type) {
@@ -962,7 +966,7 @@ function cetakLaporan(type) {
             <table class="data-table"><tr><th style="width:5%">NO</th><th style="width:45%">MUSTAHIQ</th><th style="width:20%">JUMLAH<br>(Kg/Bks)</th><th style="width:30%">KETERANGAN ASNAF</th></tr><tr><td>1</td><td class="text-left">RT 05</td><td>${rt05 || '-'}</td><td rowspan="4">MUALAF : ${mualaf || '-'}<br>RIQAB : ${riqab || '-'}<br>GHARIM : ${gharim || '-'}<br>MUSAFIR : ${musafir || '-'}</td></tr><tr><td>2</td><td class="text-left">RT 06</td><td>${rt06 || '-'}</td></tr><tr><td>3</td><td class="text-left">RT 07</td><td>${rt07 || '-'}</td></tr><tr><td>4</td><td class="text-left">RT 08</td><td>${rt08 || '-'}</td></tr><tr style="font-weight: bold; background-color: #f3f4f6;"><td></td><td class="text-left">JUMLAH MUSTAHIQ RT</td><td>${totalRT || '-'}</td><td></td></tr><tr style="font-weight: bold;"><td></td><td class="text-left">AMIL</td><td>${amil || '-'}</td><td></td></tr><tr style="font-weight: bold;"><td></td><td class="text-left">FISABILILLAH</td><td>${fisabilillahTotal || '-'}</td><td></td></tr><tr style="font-weight: bold; background-color: #d1d5db;"><td colspan="2">TOTAL KESELURUHAN</td><td>${totalMustahiq || '-'}</td><td></td></tr></table>
             <h3 style="margin-top: 15px;">DAFTAR MUSTAHIQ FI SABILILLAH</h3>
             <table class="data-table" style="width: 70%; margin: 0 auto;"><tr><th style="width:10%">NO</th><th style="width:60%">BAGIAN</th><th style="width:30%">JUMLAH (Kg/Bks)</th></tr><tr><td>1</td><td class="text-left">IMAM HARIAN</td><td>${imam || '-'}</td></tr><tr><td>2</td><td class="text-left">KHATIB JUMAT</td><td>${khatib || '-'}</td></tr><tr><td>3</td><td class="text-left">PERINTIS</td><td>${perintis || '-'}</td></tr><tr><td>4</td><td class="text-left">MUADZIN</td><td>${muadzin || '-'}</td></tr><tr><td>5</td><td class="text-left">TAKMIR</td><td>${takmir || '-'}</td></tr><tr><td>6</td><td class="text-left">PANITIA RAMADHAN</td><td>${panitia || '-'}</td></tr><tr style="font-weight: bold; background-color: #d1d5db;"><td colspan="2">TOTAL</td><td>${fisabilillahTotal || '-'}</td></tr></table>
-            <table class="sig-table"><tr><td style="width: 33.33%;"><br>Ketua Panitia<br><br><br><br><b><u>${p.ketuaZakat || '......................'}</u></b></td><td style="width: 33.33%;">Mengetahui<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 33.33%;">${strDate}<br>Sekretaris<br><br><br><br><b><u>${p.sekretarisZakat || '......................'}</u></b></td></tr></table>${footerHtml}<script>var img = document.getElementById('logo-print'); function doPrint() { window.print(); window.close(); } if (img) { if (img.complete) { doPrint(); } else { img.onload = doPrint; img.onerror = doPrint; } } else { doPrint(); }<\/script></body></html>`;
+            <table class="sig-table"><tr><td style="width: 33.33%;"><br>Ketua Panitia<br><br><br><br><b><u>${p.ketuaZakat || '......................'}</u></b></td><td style="width: 33.33%;">Mengetahui<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 33.33%;">${strDate}<br>Sekretaris<br><br><br><br><b><u>${p.sekretarisZakat || '......................'}</u></b></td></tr></table>${footerHtml}<script>var img = document.getElementById('logo-print'); function doPrint() { window.print(); window.close(); } if (img) { if (img.complete) { doPrint(); } else { img.onload = doPrint; img.onerror = doPrint; } } else { setTimeout(doPrint, 500); }<\/script></body></html>`;
         let w = window.open(); w.document.write(html); w.document.close();
     } else {
         let t = type === 'qurban' ? 'Qurban' : 'Keuangan'; let filterText = ""; let data = [];
@@ -977,10 +981,10 @@ function cetakLaporan(type) {
             html += `</tbody></table><div style="margin-top:15px; font-size:11px;"><strong>Rekapitulasi Total Hewan Qurban:</strong><ul style="margin: 5px 0 0 20px; padding: 0;"><li>Sapi : ${tSapi} Ekor</li><li>Kambing : ${tKambing} Ekor</li><li>Domba : ${tDomba} Ekor</li></ul></div><table class="sig-table"><tr><td style="width: 33.33%;"><br>Ketua Panitia Qurban<br><br><br><br><b><u>${p.ketuaQurban || '......................'}</u></b></td><td style="width: 33.33%;">Mengetahui,<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 33.33%;">${strDate}<br>Sekretaris Qurban<br><br><br><br><b><u>${p.sekretarisQurban || '......................'}</u></b></td></tr></table>`;
         } else if (type === 'kas') {
             let tMasuk = data.filter(k => k.jenis === 'Masuk').reduce((s, k) => s + getN(k.nominal), 0); let tKeluar = data.filter(k => k.jenis === 'Keluar').reduce((s, k) => s + getN(k.nominal), 0); let grandTotal = appData.kas.filter(k => k.jenis === 'Masuk').reduce((s, k) => s + getN(k.nominal), 0) - appData.kas.filter(k => k.jenis === 'Keluar').reduce((s, k) => s + getN(k.nominal), 0);
-            html += `<table class="data-table"><thead><tr><th style="text-align:center">No</th><th>Tanggal</th><th>Keterangan</th><th>Pemasukan</th><th>Pengeluaran</th></tr></thead><tbody>` + data.slice().reverse().map((x, i) => `<tr><td style="text-align:center">${i+1}</td><td style="text-align:center">${formatTanggalIndo(x.tanggal)}</td><td style="text-align:left; padding-left:5px;">${x.keterangan}</td><td style="text-align:right; padding-right:5px;">${x.jenis === 'Masuk' ? formatRupiah(getN(x.nominal)) : '-'}</td><td style="text-align:right; padding-right:5px;">${x.jenis === 'Keluar' ? formatRupiah(getN(x.nominal)) : '-'}</td></tr>`).join('');
-            html += `<tr><th colspan="3" style="text-align:right; padding-right:5px;">Total Transaksi Periode Ini</th><th style="text-align:right; padding-right:5px;">${formatRupiah(tMasuk)}</th><th style="text-align:right; padding-right:5px;">${formatRupiah(tKeluar)}</th></tr><tr><th colspan="3" style="text-align:right; padding-right:5px;">Saldo Akhir Keseluruhan Kas</th><th colspan="2" style="text-align:center">${formatRupiah(grandTotal)}</th></tr></tbody></table><table class="sig-table" style="width: 100%;"><tr><td style="width: 50%;">Mengetahui,<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 50%;">${strDate}<br>Bendahara<br><br><br><br><b><u>${p.bendahara1 || '......................'}</u></b></td></tr></table>`;
+            html += `<table class="data-table"><thead><tr><th style="text-align:center">No</th><th>Tanggal</th><th>Kategori</th><th>Keterangan</th><th>Pemasukan</th><th>Pengeluaran</th></tr></thead><tbody>` + data.slice().reverse().map((x, i) => `<tr><td style="text-align:center">${i+1}</td><td style="text-align:center">${formatTanggalIndo(x.tanggal)}</td><td style="text-align:left; padding-left:5px;">${x.kategori || '-'}</td><td style="text-align:left; padding-left:5px;">${x.keterangan}</td><td style="text-align:right; padding-right:5px;">${x.jenis === 'Masuk' ? formatRupiah(getN(x.nominal)) : '-'}</td><td style="text-align:right; padding-right:5px;">${x.jenis === 'Keluar' ? formatRupiah(getN(x.nominal)) : '-'}</td></tr>`).join('');
+            html += `<tr><th colspan="4" style="text-align:right; padding-right:5px;">Total Transaksi Periode Ini</th><th style="text-align:right; padding-right:5px;">${formatRupiah(tMasuk)}</th><th style="text-align:right; padding-right:5px;">${formatRupiah(tKeluar)}</th></tr><tr><th colspan="4" style="text-align:right; padding-right:5px;">Saldo Akhir Keseluruhan Kas</th><th colspan="2" style="text-align:center">${formatRupiah(grandTotal)}</th></tr></tbody></table><table class="sig-table" style="width: 100%;"><tr><td style="width: 50%;">Mengetahui,<br>Ketua Takmir<br><br><br><br><b><u>${p.ketua || '......................'}</u></b></td><td style="width: 50%;">${strDate}<br>Bendahara<br><br><br><br><b><u>${p.bendahara1 || '......................'}</u></b></td></tr></table>`;
         }
-        html += `${footerHtml}<script>var img = document.getElementById('logo-print'); function doPrint() { window.print(); window.close(); } if (img) { if (img.complete) { doPrint(); } else { img.onload = doPrint; img.onerror = doPrint; } } else { doPrint(); }<\/script></body></html>`;
+        html += `${footerHtml}<script>var img = document.getElementById('logo-print'); function doPrint() { window.print(); window.close(); } if (img) { if (img.complete) { doPrint(); } else { img.onload = doPrint; img.onerror = doPrint; } } else { setTimeout(doPrint, 500); }<\/script></body></html>`;
         let w = window.open(); w.document.write(html); w.document.close();
     }
 }
@@ -1024,6 +1028,31 @@ function closeAdminMenu() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// FUNGSI UNTUK MENGGANTI KATEGORI BERDASARKAN JENIS KAS
+function updateKasKategori() {
+    const jenis = document.getElementById('kas-j').value;
+    const kategoriSelect = document.getElementById('kas-kat');
+    
+    let options = '';
+    if (jenis === 'Masuk') {
+        options = `
+            <option value="Kotak Amal/Infak">Kotak Amal/Infak</option>
+            <option value="Sumbangan & Donasi">Sumbangan & Donasi</option>
+            <option value="Amil, Zakat, & Wakaf">Amil, Zakat, & Wakaf</option>
+            <option value="Penyelenggaraan Kegiatan">Penyelenggaraan Kegiatan</option>
+            <option value="Pendapatan Lain-lain">Pendapatan Lain-lain</option>
+        `;
+    } else {
+        options = `
+            <option value="Operasional Rutin">Operasional Rutin</option>
+            <option value="Pembangunan & Perbaikan">Pembangunan & Perbaikan</option>
+            <option value="Kegiatan Keagamaan">Kegiatan Keagamaan</option>
+            <option value="Kesejahteraan Amil/Pegawai">Kesejahteraan Amil/Pegawai</option>
+            <option value="Sosial & Pendidikan">Sosial & Pendidikan</option>
+        `;
+    }
+    kategoriSelect.innerHTML = options;
+}
 
 function renderAdmin(container) {
     let isDetailOpen = activeAdminTab !== '';
@@ -1064,7 +1093,7 @@ function renderAdmin(container) {
                 <!-- MENU: QURBAN -->
                 <button onclick="openAdminMenu('a-qur', 'Data Qurban')" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center active:bg-indigo-50">
                     <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-3"><i class="fa-solid fa-cow text-2xl"></i></div>
-                    <span class="text-sm font-bold text-gray-800">Qurban</span>
+                    <span class="text-sm font-bold text-gray-800">Data Qurban</span>
                 </button>
                 
                 <!-- MENU: PROFIL -->
@@ -1100,11 +1129,29 @@ function renderAdmin(container) {
                     <h3 class="text-sm font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">Input Transaksi Kas</h3>
                     <div class="grid grid-cols-2 gap-3 mb-3">
                         <div><label class="text-[10px] text-gray-500 font-bold mb-1 block">Tanggal</label><input type="date" id="kas-t" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold focus:border-emerald-500 outline-none"></div>
-                        <div><label class="text-[10px] text-gray-500 font-bold mb-1 block">Jenis</label><select id="kas-j" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold focus:border-emerald-500 outline-none"><option value="Masuk">Pemasukan (+)</option><option value="Keluar">Pengeluaran (-)</option></select></div>
+                        <div>
+                            <label class="text-[10px] text-gray-500 font-bold mb-1 block">Jenis</label>
+                            <select id="kas-j" onchange="updateKasKategori()" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold focus:border-emerald-500 outline-none">
+                                <option value="Masuk">Pemasukan (+)</option>
+                                <option value="Keluar">Pengeluaran (-)</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="mb-3"><label class="text-[10px] text-gray-500 font-bold mb-1 block">Keterangan</label><input type="text" id="kas-k" placeholder="Contoh: Kotak Amal Jumat" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold focus:border-emerald-500 outline-none"></div>
+                    
+                    <div class="mb-3">
+                        <label class="text-[10px] text-gray-500 font-bold mb-1 block">Kategori Transaksi</label>
+                        <select id="kas-kat" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold focus:border-emerald-500 outline-none">
+                            <option value="Kotak Amal/Infak">Kotak Amal/Infak</option>
+                            <option value="Sumbangan & Donasi">Sumbangan & Donasi</option>
+                            <option value="Amil, Zakat, & Wakaf">Amil, Zakat, & Wakaf</option>
+                            <option value="Penyelenggaraan Kegiatan">Penyelenggaraan Kegiatan</option>
+                            <option value="Pendapatan Lain-lain">Pendapatan Lain-lain</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3"><label class="text-[10px] text-gray-500 font-bold mb-1 block">Keterangan Detail</label><input type="text" id="kas-k" placeholder="Contoh: Kotak Amal Jumat" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold focus:border-emerald-500 outline-none"></div>
                     <div class="mb-4"><label class="text-[10px] text-gray-500 font-bold mb-1 block">Nominal (Rp)</label><input type="number" id="kas-n" placeholder="0" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold focus:border-emerald-500 outline-none"></div>
-                    <button onclick="save(event, 'addKas',{tanggal:v('kas-t'),jenis:v('kas-j'),keterangan:v('kas-k'),nominal:getN(v('kas-n'))})" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg text-sm">Simpan</button>
+                    <button onclick="save(event, 'addKas',{tanggal:v('kas-t'),jenis:v('kas-j'),kategori:v('kas-kat'),keterangan:v('kas-k'),nominal:getN(v('kas-n'))})" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg text-sm">Simpan</button>
                 </div>
                 
                 <h3 class="text-sm font-bold text-gray-800 mb-2 px-1">Hapus Data Kas</h3>
@@ -1113,7 +1160,7 @@ function renderAdmin(container) {
                         <div class="bg-white p-3 rounded-xl border border-gray-200 flex justify-between items-center">
                             <div>
                                 <h4 class="text-xs font-bold text-gray-800 line-clamp-1">${x.keterangan}</h4>
-                                <p class="text-[10px] font-medium text-gray-500">${formatTanggalIndo(x.tanggal)} • <span class="${x.jenis==='Masuk'?'text-emerald-600':'text-red-500'} font-bold">${formatRupiah(getN(x.nominal))}</span></p>
+                                <p class="text-[10px] font-medium text-gray-500">${formatTanggalIndo(x.tanggal)} • ${x.kategori || ''} • <span class="${x.jenis==='Masuk'?'text-emerald-600':'text-red-500'} font-bold">${formatRupiah(getN(x.nominal))}</span></p>
                             </div>
                             <button onclick="del(event, 'deleteKas','${x.id}')" class="w-8 h-8 rounded bg-red-50 text-red-500 flex items-center justify-center border border-red-100 shrink-0"><i class="fa-solid fa-trash text-xs"></i></button>
                         </div>`).join('')}
@@ -1190,7 +1237,7 @@ function renderAdmin(container) {
                 </div>
                 <h3 class="text-sm font-bold text-gray-800 mb-2 px-1">Hapus Data</h3>
                 <div class="space-y-2">
-                    ${appData.zakatDist ? appData.zakatDist.filter(x => x.tahun == new Date().getFullYear()).slice().reverse().map(x => `
+                    ${appData.zakatDist ? appData.zakatDist.filter(x => x.tahun == new Date().getFullYear()).reverse().map(x => `
                         <div class="bg-white p-3 rounded-xl border border-gray-200 flex justify-between items-center">
                             <div>
                                 <h4 class="text-xs font-bold text-gray-800">${x.kategori}</h4>
@@ -1276,9 +1323,9 @@ function renderAdmin(container) {
 function v(id) { const el = document.getElementById(id); return el ? el.value : ''; }
 
 async function save(e, act, p) {
-    if(act === 'addKas' && (!p.tanggal || !p.keterangan || p.nominal <= 0)) { showToast('Isi Tanggal, Keterangan & Nominal!', 'error'); return; }
+    if(act === 'addKas' && (!p.tanggal || !p.kategori || !p.keterangan || p.nominal <= 0)) { showToast('Isi Tanggal, Kategori, Keterangan & Nominal!', 'error'); return; }
     if(act === 'addZakat' && (!p.tanggal || !p.nama || p.jumlah <= 0)) { showToast('Isi Tanggal, Nama & Jumlah!', 'error'); return; }
-    if(act === 'addZakatDist' && (!p.tahun || parseInt(p.tahun) < 2000 || p.jumlah <= 0)) { showToast('Isi Tahun & Jumlah!', 'error'); return; }
+    if(act === 'addZakatDist' && (!p.tahun || p.jumlah <= 0)) { showToast('Isi Tahun & Jumlah!', 'error'); return; }
     if(act === 'addQurban' && (!p.tahun || !p.nama)) { showToast('Isi Tahun & Nama!', 'error'); return; }
 
     const btn = e.currentTarget; const origText = btn.innerHTML;
@@ -1292,9 +1339,9 @@ async function save(e, act, p) {
     if(res && res.status === 'success') {
         // PEMBARUAN DATA LOKAL SECARA OPTIMIS (INSTAN! Tanpa perlu download ulang semua sheet)
         p.id = res.id; 
-        if(act === 'addKas') { appData.kas.push(p); document.getElementById('kas-t').value = ''; document.getElementById('kas-k').value = ''; document.getElementById('kas-n').value = ''; }
-        if(act === 'addKhotib') { appData.khotib.push(p); document.getElementById('kho-t').value = ''; document.getElementById('kho-n').value = ''; document.getElementById('kho-te').value = ''; }
-        if(act === 'addZakat') { appData.zakat.push(p); document.getElementById('zak-t').value = ''; document.getElementById('zak-n').value = ''; document.getElementById('zak-ju').value = ''; }
+        if(act === 'addKas') { appData.kas.push(p); document.getElementById('kas-k').value = ''; document.getElementById('kas-n').value = ''; }
+        if(act === 'addKhotib') { appData.khotib.push(p); document.getElementById('kho-n').value = ''; document.getElementById('kho-te').value = ''; }
+        if(act === 'addZakat') { appData.zakat.push(p); document.getElementById('zak-n').value = ''; document.getElementById('zak-ju').value = ''; }
         if(act === 'addZakatDist') { appData.zakatDist.push(p); document.getElementById('zdist-j').value = ''; }
         if(act === 'addQurban') { appData.qurban.push(p); document.getElementById('qur-n').value = ''; document.getElementById('qur-k').value = ''; }
         if(act === 'saveProfil') appData.profil = { ...appData.profil, ...p };

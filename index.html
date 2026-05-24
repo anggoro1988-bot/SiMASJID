@@ -190,7 +190,7 @@ function showToast(msg, type = 'success') {
 
 // API HANDLER
 async function fetchApp(action, payload = {}) {
-    if (GAS_URL === "https://script.google.com/macros/s/AKfycbwVi5CceP0N8zmLqYGC6CYwfVPKgEWqW1KoZ1A-6pQfKuzzGvQDBZjXhhu6EAwTnxEc/exec" || !GAS_URL.startsWith("http")) {
+    if (GAS_URL === "http://script.google.com/macros/s/AKfycbwVi5CceP0N8zmLqYGC6CYwfVPKgEWqW1KoZ1A-6pQfKuzzGvQDBZjXhhu6EAwTnxEc/exec" || !GAS_URL.startsWith("http")) {
         if (action === 'getData') return { status: 'success', profil: appData.profil || {}, pengurus: appData.pengurus || {}, khotib: [], kas: [], zakat: [], qurban: [], zakatDist: [] };
         return { status: 'error', message: 'URL GAS belum disetel.' };
     }
